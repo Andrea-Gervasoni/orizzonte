@@ -1,204 +1,226 @@
 #include <iostream>
 #include <ctime>
-#include <string>
 #include <random>
 #include <algorithm>
+#include <vector>
 
 using namespace std;
 
-const int maxSim = 10000;
-
 // ===================== STRUCT =====================
 
-struct info {
-    string nome;
-    string cognome;
-    string sesso;
-    int eta;
-    string data;
+struct Saver {
+    int age;
+    int retirementAge;
+    int annualContribution;
+    int yearsToRetirement;
+    double expectedReturn;   // mu    - from the risk profile
+    double volatility;       // sigma - from the risk profile
 };
 
-struct dati {
-    int eta;
-    int contributiDATI;
-    int stipendio;
-    int versamentoXanno;
-    int annirimasti;
-};
+// ===================== PROTOTYPES =====================
 
-// ===================== PROTOTIPI =====================
-
-void biometrici(info &persona);
-void specifici(dati &pers);
-double montecarlo(dati &pers);
-void grafico(int f1, int f2, int f3, int f4, int f5);
+void   readInputs(Saver &s);
+void   chooseRiskProfile(Saver &s);
+int    chooseSimulationCount();
+double simulateOnce(Saver &s);
+void   drawHistogram(int b1, int b2, int b3, int b4, int b5, int nSims);
 
 // ===================== MAIN =====================
 
 int main()
 {
-    info persona;
-    dati pers;
-
-    double finale[maxSim];
-
-    int f1 = 0, f2 = 0, f3 = 0, f4 = 0, f5 = 0;
+    Saver s;
 
     cout << "\n\n============================================================";
-    cout << "\n        SIMULATORE MONTECARLO - VERSIONE PROTOTIPO";
+    cout << "\n        ORIZZONTE - MONTE CARLO SIMULATOR (PROTOTYPE)";
     cout << "\n============================================================\n";
-
-    cout << "\nObiettivo: simulare scenari pensionistici e finanziari\n";
-
-    cout << "\nPremi INVIO per iniziare...";
+    cout << "\nGoal: simulate retirement-savings accumulation scenarios.\n";
+    cout << "\nPress ENTER to start...";
     cin.get();
 
-    biometrici(persona);
+    // 1) numeric inputs
+    readInputs(s);
 
-    cout << "\n\u2714 Dati biometrici acquisiti correttamente.";
-    cout << "\nBenvenuto, " << persona.nome << ".\n";
+    // 2) risk profile: the user picks the RISK, we REVEAL the expected return
+    chooseRiskProfile(s);
 
-    pers.eta = persona.eta;
+    // 3) number of simulations
+    int nSims = chooseSimulationCount();
 
-    specifici(pers);
-
-    cout << "\n\u2714 Acquisizione completata. Avvio simulazione...\n";
-
-    // ===================== ANNI RIMASTI =====================
-
-    if (persona.sesso == "M" || persona.sesso == "m" || persona.sesso == "maschio")
-        pers.annirimasti = 42 - pers.contributiDATI;
-    else if (persona.sesso == "F" || persona.sesso == "f" || persona.sesso == "femmina")
-        pers.annirimasti = 41 - pers.contributiDATI;
-    else
-        pers.annirimasti = 40 - pers.contributiDATI;
-
-    // ===================== MONTECARLO =====================
-
-    for (int i = 0; i < maxSim; i++)
-    {
-        finale[i] = montecarlo(pers);
+    // 4) years left until retirement
+    s.yearsToRetirement = s.retirementAge - s.age;
+    if (s.yearsToRetirement <= 0) {
+        cout << "\nRetirement age must be greater than current age. Exiting.\n";
+        return 1;
     }
 
-    // ===================== RISULTATI =====================
+    cout << "\nRunning " << nSims << " simulations over " << s.yearsToRetirement << " years...\n";
 
-    sort(finale, finale + maxSim);      // mette i 10.000 risultati in fila, dal piu' piccolo al piu' grande
+    // 5) results vector: EXACTLY nSims cells, sized now (at runtime)
+    vector<double> results(nSims);
 
-    double sfortunato = finale[1000];   // sotto questo sta il 10% peggiore
-    double tipico     = finale[5000];   // il valore in mezzo alla fila
-    double fortunato  = finale[9000];   // sopra questo sta il 10% migliore
+    for (int i = 0; i < nSims; i++)
+        results[i] = simulateOnce(s);
 
-    cout << "\n\n================ I TUOI SCENARI ================\n";
-    cout << "\nScenario sfortunato (10% peggiore): " << (int)sfortunato << " EUR";
-    cout << "\nScenario tipico (meta' dei casi):   " << (int)tipico << " EUR";
-    cout << "\nScenario fortunato (10% migliore):  " << (int)fortunato << " EUR";
+    // 6) sort and read the percentiles
+    sort(results.begin(), results.end());
 
-    // ===================== ANALISI =====================
+    double unlucky = results[nSims / 10];       // below this lies the worst 10%
+    double median  = results[nSims / 2];        // the value in the middle of the line
+    double lucky   = results[nSims * 9 / 10];   // above this lies the best 10%
 
-    for (int i = 0; i < maxSim; i++)
+    cout << "\n\n================ YOUR SCENARIOS ================\n";
+    cout << "\nUnlucky scenario (worst 10%):   " << (int)unlucky << " EUR";
+    cout << "\nTypical scenario (median case): " << (int)median  << " EUR";
+    cout << "\nLucky scenario (best 10%):      " << (int)lucky   << " EUR";
+
+    // 7) distribution by buckets
+    int b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0;
+    for (int i = 0; i < nSims; i++)
     {
-        if (finale[i] < 30000)
-            f1++;
-        else if (finale[i] < 60000)
-            f2++;
-        else if (finale[i] < 90000)
-            f3++;
-        else if (finale[i] < 120000)
-            f4++;
-        else
-            f5++;
+        if (results[i] < 30000)        b1++;
+        else if (results[i] < 60000)   b2++;
+        else if (results[i] < 90000)   b3++;
+        else if (results[i] < 120000)  b4++;
+        else                           b5++;
     }
 
-    cout << "\n\n================ RISULTATI PROBABILISTICI ================\n";
+    cout << "\n\n================ PROBABILISTIC RESULTS ================\n";
+    cout << "\n0 - 30k:    " << (b1 * 100) / nSims << "%";
+    cout << "\n30k - 60k:  " << (b2 * 100) / nSims << "%";
+    cout << "\n60k - 90k:  " << (b3 * 100) / nSims << "%";
+    cout << "\n90k - 120k: " << (b4 * 100) / nSims << "%";
+    cout << "\n120k+:      " << (b5 * 100) / nSims << "%";
 
-    cout << "\nBasso rendimento:  " << (f1 * 100) / maxSim << "%";
-    cout << "\nMedio rendimento:  " << (f2 * 100) / maxSim << "%";
-    cout << "\nBuon rendimento:   " << (f3 * 100) / maxSim << "%";
-    cout << "\nAlto rendimento:   " << (f4 * 100) / maxSim << "%";
-    cout << "\nEccellente:        " << (f5 * 100) / maxSim << "%";
-
-    // ===================== ISTOGRAMMA =====================
-
-    grafico(f1, f2, f3, f4, f5);
+    drawHistogram(b1, b2, b3, b4, b5, nSims);
 
     return 0;
 }
 
-// ===================== FUNZIONI =====================
+// ===================== NUMERIC INPUTS =====================
 
-void biometrici(info &persona)
+void readInputs(Saver &s)
 {
-    cout << "\n\n---------------- DATI PERSONALI ----------------\n";
+    cout << "\n\n---------------- YOUR DATA ----------------\n";
 
-    cout << "Nome: ";
-    cin >> persona.nome;
+    cout << "Current age: ";
+    cin >> s.age;
 
-    cout << "Cognome: ";
-    cin >> persona.cognome;
+    cout << "Age you want to retire at: ";
+    cin >> s.retirementAge;
 
-    cout << "Genere (M/F): ";
-    cin >> persona.sesso;
-
-    cout << "Data nascita: ";
-    cin >> persona.data;
-
-    cout << "Eta': ";
-    cin >> persona.eta;
+    cout << "Annual contribution (EUR): ";
+    cin >> s.annualContribution;
 }
 
-void specifici(dati &pers)
+// ===================== RISK PROFILE =====================
+// The user chooses HOW MUCH risk to take.
+// The expected return is NOT chosen: it is the CONSEQUENCE, and we show it.
+
+void chooseRiskProfile(Saver &s)
 {
-    cout << "\n\n---------------- DATI CONTRIBUTIVI ----------------\n";
+    int choice;
 
-    cout << "Anni contributi versati: ";
-    cin >> pers.contributiDATI;
+    cout << "\n\n---------------- RISK PROFILE ----------------\n";
+    cout << "Choose how much risk you are willing to take.\n";
+    cout << "More risk = higher expected return, but bigger swings.\n\n";
+    cout << "1) Conservative (bonds)\n";
+    cout << "2) Balanced\n";
+    cout << "3) Aggressive   (equities)\n";
+    cout << "Choice: ";
+    cin >> choice;
 
-    cout << "Stipendio mensile (\u20ac): ";
-    cin >> pers.stipendio;
-
-    cout << "Versamento annuo (\u20ac): ";
-    cin >> pers.versamentoXanno;
-}
-
-// ===================== CUORE: MONTECARLO =====================
-
-double montecarlo(dati &pers)
-{
-    // create una volta sola, condivise da tutte le 10.000 simulazioni
-    static mt19937 gen(time(NULL));
-    static normal_distribution<double> campana(0.07, 0.15); // media 7%, volatilita' 15%
-
-    double tot = 0.0;
-
-    for (int i = 0; i < pers.annirimasti; i++)
+    switch (choice)
     {
-        double r = campana(gen);                       // rendimento casuale dell'anno, dalla campana
-        tot = tot * (1.0 + r) + pers.versamentoXanno;  // TUTTO il capitale cresce, poi aggiungo il versamento
+        case 1: s.expectedReturn = 0.03; s.volatility = 0.05; break;
+        case 2: s.expectedReturn = 0.05; s.volatility = 0.10; break;
+        case 3: s.expectedReturn = 0.07; s.volatility = 0.15; break;
+        default:
+            cout << "Invalid choice, using the Balanced profile.\n";
+            s.expectedReturn = 0.05; s.volatility = 0.10;
     }
 
-    return tot;
+    // THE REVEAL: what this risk level gets you
+    cout << "\n-> With this profile you can expect an average return of "
+         << (int)(s.expectedReturn * 100) << "% per year,";
+    cout << "\n   but be ready for swings of roughly +/- "
+         << (int)(s.volatility * 100) << "%.\n";
 }
 
-// ===================== ISTOGRAMMA =====================
+// ===================== NUMBER OF SIMULATIONS =====================
 
-void grafico(int f1, int f2, int f3, int f4, int f5)
+int chooseSimulationCount()
 {
-    cout << "\n\n================ DISTRIBUZIONE RISULTATI ================\n";
+    int choice;
+
+    cout << "\n\n---------------- NUMBER OF SIMULATIONS ----------------\n";
+    cout << "More simulations = more stable estimate, but slower.\n\n";
+    cout << "1) 1,000   (fast, shakier estimate)\n";
+    cout << "2) 2,000\n";
+    cout << "3) 5,000\n";
+    cout << "4) 10,000  (recommended)\n";
+    cout << "5) 20,000  (slow, more stable estimate)\n";
+    cout << "Choice: ";
+    cin >> choice;
+
+    switch (choice)
+    {
+        case 1: return 1000;
+        case 2: return 2000;
+        case 3: return 5000;
+        case 4: return 10000;
+        case 5: return 20000;
+        default:
+            cout << "Invalid choice, using 10,000 by default.\n";
+            return 10000;
+    }
+}
+
+// ===================== CORE: ONE MONTE CARLO TRIAL =====================
+
+double simulateOnce(Saver &s)
+{
+    // ONE random engine, shared across all simulations (static = created only once).
+    static mt19937 gen(time(NULL));
+
+    // The bell curve uses the expected return and volatility of the chosen profile.
+    normal_distribution<double> bell(s.expectedReturn, s.volatility);
+
+    double total = 0.0;
+
+    for (int i = 0; i < s.yearsToRetirement; i++)
+    {
+        double r = bell(gen);                              // this year's random return, from the bell curve
+        total = total * (1.0 + r) + s.annualContribution; // ALL capital grows, then I add the contribution
+    }
+
+    return total;
+}
+
+// ===================== HISTOGRAM =====================
+
+void drawHistogram(int b1, int b2, int b3, int b4, int b5, int nSims)
+{
+    cout << "\n\n================ RESULT DISTRIBUTION ================\n";
+
+    // each block represents ~1% of cases (scale adapts to nSims)
+    int scale = nSims / 100;
+    if (scale < 1) scale = 1;
 
     cout << "\n0 - 30k      ";
-    for (int i = 0; i < f1 / 100; i++) cout << "\u2588";
+    for (int i = 0; i < b1 / scale; i++) cout << "\u2588";
 
     cout << "\n30k - 60k    ";
-    for (int i = 0; i < f2 / 100; i++) cout << "\u2588";
+    for (int i = 0; i < b2 / scale; i++) cout << "\u2588";
 
     cout << "\n60k - 90k    ";
-    for (int i = 0; i < f3 / 100; i++) cout << "\u2588";
+    for (int i = 0; i < b3 / scale; i++) cout << "\u2588";
 
     cout << "\n90k - 120k   ";
-    for (int i = 0; i < f4 / 100; i++) cout << "\u2588";
+    for (int i = 0; i < b4 / scale; i++) cout << "\u2588";
 
     cout << "\n120k+        ";
-    for (int i = 0; i < f5 / 100; i++) cout << "\u2588";
+    for (int i = 0; i < b5 / scale; i++) cout << "\u2588";
 
     cout << "\n==========================================================\n";
 }

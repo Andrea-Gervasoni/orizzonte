@@ -5,7 +5,7 @@ Gratuito e open source, per i lavoratori italiani.
 
 # Sito / Site
 
-🔗 **Live:** https://andrea-gervasoni.github.io/ORIZZONTE-site/
+🔗 **Live:** https://andrea-gervasoni.github.io/Orizzonte-site/
 
 ---
 
